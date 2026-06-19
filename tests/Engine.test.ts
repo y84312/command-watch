@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Entity, Building, Unit, Ore, Projectile, GameEngine } from '../src/game/Engine';
+import { Entity, Building, Unit, Ore, Projectile } from '../src/game/entities';
+import { GameEngine } from '../src/game/Engine';
 import { SIZES, STATS, POWER, COSTS, MAP_SIZE } from '../src/game/constants';
 
 // Mock audio
