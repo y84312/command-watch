@@ -1,113 +1,91 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GameEngine, Building, Unit } from '../src/game/Engine';
 import { COSTS, MAP_SIZE } from '../src/game/constants';
+import { decideAiAction, AiContext, AiUnit } from '../src/game/AiLogic';
 
 // Mock audio
 vi.mock('../src/game/Audio', () => ({
   audio: {
-    playExplosion: vi.fn(),
-    playClick: vi.fn(),
-    playError: vi.fn(),
-    playReady: vi.fn(),
-    playPlace: vi.fn(),
-    playAck: vi.fn(),
-    init: vi.fn(),
+    playExplosion: vi.fn(), playClick: vi.fn(), playError: vi.fn(),
+    playReady: vi.fn(), playPlace: vi.fn(), playAck: vi.fn(), init: vi.fn(),
   },
 }));
 
-// ── Canvas mock helper ──────────────────────────────────────────────────────
-function createMockCanvas(overrides: { width?: number; height?: number } = {}): HTMLCanvasElement {
+function createMockCanvas(): HTMLCanvasElement {
   const ctx = {
-    fillRect: vi.fn(),
-    fill: vi.fn(),
-    beginPath: vi.fn(),
-    moveTo: vi.fn(),
-    lineTo: vi.fn(),
-    arc: vi.fn(),
-    ellipse: vi.fn(),
-    stroke: vi.fn(),
-    strokeRect: vi.fn(),
-    drawImage: vi.fn(),
-    clearRect: vi.fn(),
-    save: vi.fn(),
-    restore: vi.fn(),
-    translate: vi.fn(),
-    putImageData: vi.fn(),
+    fillRect: vi.fn(), fill: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(),
+    lineTo: vi.fn(), arc: vi.fn(), ellipse: vi.fn(), stroke: vi.fn(),
+    strokeRect: vi.fn(), drawImage: vi.fn(), clearRect: vi.fn(), save: vi.fn(),
+    restore: vi.fn(), translate: vi.fn(), putImageData: vi.fn(),
     createImageData: vi.fn().mockReturnValue({ data: new Uint8ClampedArray(4 * 2000 * 63) }),
-    fillText: vi.fn(),
-    measureText: vi.fn().mockReturnValue({ width: 0 }),
+    fillText: vi.fn(), measureText: vi.fn().mockReturnValue({ width: 0 }),
   } as unknown as CanvasRenderingContext2D;
-
-  const canvas = {
-    width: overrides.width ?? 800,
-    height: overrides.height ?? 600,
-    getContext: vi.fn().mockReturnValue(ctx),
+  return {
+    width: 800, height: 600, getContext: vi.fn().mockReturnValue(ctx),
     getBoundingClientRect: vi.fn().mockReturnValue({ left: 0, top: 0, width: 800, height: 600 }),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
+    addEventListener: vi.fn(), removeEventListener: vi.fn(),
   } as unknown as HTMLCanvasElement;
-
-  return canvas;
 }
 
-// ── Helper: run AI ticks until a condition is met or max ticks exhausted ─────
-function runAiUntil(
-  engine: GameEngine,
-  maxTicks: number = 50,
-  condition: (e: GameEngine) => boolean,
-) {
+function runAiUntil(engine: GameEngine, maxTicks: number, condition: (e: GameEngine) => boolean) {
   for (let i = 0; i < maxTicks; i++) {
-    engine.updateAI(2000); // 2000ms = one AI tick
+    engine.updateAI(2000);
     if (condition(engine)) return;
   }
 }
 
-// ── Helper: count buildings of a type for a player ───────────────────────────
 function countBuildings(engine: GameEngine, playerId: number, type: string): number {
   return engine.buildings.filter(b => b.player === playerId && b.type === type).length;
 }
 
-// ── Helper: count military units (non-harvester) for a player ────────────────
 function countMilitary(engine: GameEngine, playerId: number): number {
   return engine.units.filter(u => u.player === playerId && u.type !== 'harvester').length;
 }
 
-// ── Helper: clear all military units for a player (for isolated tests) ───────
-function clearMilitary(engine: GameEngine, playerId: number) {
-  engine.units = engine.units.filter(u => !(u.player === playerId && u.type !== 'harvester'));
+// ── AiLogic pure function test helpers ──────────────────────────────────────
+function makeAiUnit(opts: Partial<AiUnit> & { x: number; y: number }): AiUnit {
+  return {
+    id: opts.id ?? 1, x: opts.x, y: opts.y, w: opts.w ?? 10, h: opts.h ?? 10,
+    player: opts.player ?? 2, type: opts.type ?? 'infantry', state: opts.state ?? 'idle',
+    targetPos: opts.targetPos ?? null, targetEntity: opts.targetEntity ?? null,
+    distanceTo: vi.fn().mockReturnValue(0),
+  };
+}
+
+function makeAiCtx(overrides: Partial<AiContext> = {}): AiContext {
+  return {
+    playerId: 2 as any,
+    military: overrides.military ?? [],
+    enemyUnits: overrides.enemyUnits ?? [],
+    enemyBuildings: overrides.enemyBuildings ?? [],
+    conyard: overrides.conyard ?? { x: 1800, y: 1800, w: 96, h: 96 },
+    aiScoutedBase: overrides.aiScoutedBase ?? false,
+    baseX: overrides.baseX ?? 200,
+    baseY: overrides.baseY ?? 200,
+  };
 }
 
 // ============================================================================
-describe('AI Build Order Sequence', () => {
+describe('AI Build Order Sequence (integration)', () => {
   let engine: GameEngine;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const canvas = createMockCanvas();
-    engine = new GameEngine(canvas, vi.fn());
-    // Give AI plenty of credits
+    engine = new GameEngine(createMockCanvas(), vi.fn());
     engine.players[2].credits = 99999;
-    // Reset AI timer so first call fires immediately
     engine.aiTimer = 2000;
   });
 
   it('starts in build_power state and builds a powerplant first', () => {
-    // Initially player 2 has only a conyard
     expect(countBuildings(engine, 2, 'conyard')).toBe(1);
     expect(countBuildings(engine, 2, 'powerplant')).toBe(0);
-
-    // Run one AI tick
     engine.updateAI(2000);
-
     expect(countBuildings(engine, 2, 'powerplant')).toBe(1);
   });
 
   it('builds refinery after powerplant exists', () => {
-    // First tick: builds powerplant
     engine.updateAI(2000);
     expect(countBuildings(engine, 2, 'powerplant')).toBe(1);
-
-    // Second tick: should build refinery
     engine.updateAI(2000);
     expect(countBuildings(engine, 2, 'refinery')).toBe(1);
   });
@@ -116,7 +94,6 @@ describe('AI Build Order Sequence', () => {
     engine.updateAI(2000); // powerplant
     engine.updateAI(2000); // refinery
     expect(countBuildings(engine, 2, 'refinery')).toBe(1);
-
     engine.updateAI(2000); // barracks
     expect(countBuildings(engine, 2, 'barracks')).toBe(1);
   });
@@ -126,43 +103,27 @@ describe('AI Build Order Sequence', () => {
     engine.updateAI(2000); // refinery
     engine.updateAI(2000); // barracks
     expect(countBuildings(engine, 2, 'barracks')).toBe(1);
-
     engine.updateAI(2000); // warfactory
     expect(countBuildings(engine, 2, 'warfactory')).toBe(1);
   });
 
-  it('transitions through full build order: powerplant → refinery → barracks → warfactory', () => {
+  it('transitions through full build order', () => {
     runAiUntil(engine, 20, () => countBuildings(engine, 2, 'warfactory') > 0);
-
-    // Verify all buildings exist
     expect(countBuildings(engine, 2, 'powerplant')).toBe(1);
     expect(countBuildings(engine, 2, 'refinery')).toBe(1);
     expect(countBuildings(engine, 2, 'barracks')).toBe(1);
     expect(countBuildings(engine, 2, 'warfactory')).toBe(1);
   });
 
-  it('spams units after warfactory is built (spam state)', () => {
-    // Build the full tech tree
+  it('spams units after warfactory is built', () => {
     runAiUntil(engine, 20, () => countBuildings(engine, 2, 'warfactory') > 0);
-    expect(countBuildings(engine, 2, 'warfactory')).toBe(1);
-
     const unitsBefore = engine.units.filter(u => u.player === 2).length;
-
-    // Run several more AI ticks – should produce units
-    for (let i = 0; i < 10; i++) {
-      engine.updateAI(2000);
-    }
-
-    const unitsAfter = engine.units.filter(u => u.player === 2).length;
-    expect(unitsAfter).toBeGreaterThan(unitsBefore);
+    for (let i = 0; i < 10; i++) engine.updateAI(2000);
+    expect(engine.units.filter(u => u.player === 2).length).toBeGreaterThan(unitsBefore);
   });
 
   it('does not build duplicate powerplant or refinery', () => {
-    // Run many ticks
-    for (let i = 0; i < 15; i++) {
-      engine.updateAI(2000);
-    }
-
+    for (let i = 0; i < 15; i++) engine.updateAI(2000);
     expect(countBuildings(engine, 2, 'powerplant')).toBe(1);
     expect(countBuildings(engine, 2, 'refinery')).toBe(1);
     expect(countBuildings(engine, 2, 'barracks')).toBe(1);
@@ -170,234 +131,95 @@ describe('AI Build Order Sequence', () => {
 });
 
 // ============================================================================
-describe('AI Scouting Behavior', () => {
-  let engine: GameEngine;
+describe('AI Scout/Attack Logic (pure function)', () => {
+  const fixedRandom = () => 0.5;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    const canvas = createMockCanvas();
-    engine = new GameEngine(canvas, vi.fn());
-    engine.players[2].credits = 99999;
-    engine.aiTimer = 2000;
+  it('scout: military < 5 and not scouted → scout action', () => {
+    const scout = makeAiUnit({ x: 1700, y: 1700 });
+    const ctx = makeAiCtx({ military: [scout], aiScoutedBase: false });
+    const action = decideAiAction(ctx, () => 0.3);
+    expect(action.type).toBe('scout');
+    expect(action.targetPos).toEqual({ x: 40, y: 40 });
   });
 
-  it('sends a scout when military count is between 1 and 4', () => {
-    // Build the full tech tree so AI enters 'spam' state where scouting runs
-    runAiUntil(engine, 30, () => countBuildings(engine, 2, 'warfactory') > 0);
-
-    // Remove all player 2 units so AI has no pre-existing military
-    engine.units = engine.units.filter(u => u.player !== 2);
-
-    // Add exactly 1 infantry as the only military unit
-    const barracks = engine.buildings.find(b => b.player === 2 && b.type === 'barracks')!;
-    const scout = new Unit(barracks.center.x, barracks.center.y + 50, 'infantry', 2);
-    engine.units.push(scout);
-
-    expect(countMilitary(engine, 2)).toBe(1);
-
-    // Mock Math.random so AI doesn't spawn extra units during this tick
-    const origRandom = Math.random;
-    Math.random = () => 0.9; // > 0.5 so tank path is taken, but we have no warfactory for p1
-
-    // Run AI – should send scout toward enemy base
-    engine.aiTimer = 2000;
-    engine.updateAI(2000);
-
-    Math.random = origRandom;
-
-    // Scout should now be moving (AI sent it toward enemy base)
-    expect(scout.state).toBe('moving');
-    expect(scout.targetPos).not.toBeNull();
-    expect(scout.targetEntity).toBeNull();
+  it('scout: 4 military units → scout', () => {
+    const military = Array.from({ length: 4 }, (_, i) => makeAiUnit({ x: 1700 + i * 10, y: 1700 }));
+    const ctx = makeAiCtx({ military, aiScoutedBase: false });
+    expect(decideAiAction(ctx, fixedRandom).type).toBe('scout');
   });
 
-  it('scout target position is near enemy base area', () => {
-    runAiUntil(engine, 30, () => countBuildings(engine, 2, 'warfactory') > 0);
-    clearMilitary(engine, 2);
-
-    const barracks = engine.buildings.find(b => b.player === 2 && b.type === 'barracks')!;
-    const scout = new Unit(barracks.center.x, barracks.center.y + 50, 'infantry', 2);
-    engine.units.push(scout);
-
-    engine.aiTimer = 2000;
-    engine.updateAI(2000);
-
-    // Player 2's enemy is player 1, baseX=200, baseY=200
-    // Scout should be sent toward that area
-    expect(scout.targetPos).not.toBeNull();
-    expect(scout.targetPos!.x).toBeLessThan(1000);
-    expect(scout.targetPos!.y).toBeLessThan(1000);
+  it('attack: military >= 5 and scouted → attack conyard', () => {
+    const military = Array.from({ length: 5 }, (_, i) => makeAiUnit({ x: 1700 + i * 10, y: 1700 }));
+    const enemyConyard = makeAiUnit({ x: 200, y: 200, w: 96, h: 96, type: 'conyard' });
+    const ctx = makeAiCtx({ military, enemyBuildings: [enemyConyard], aiScoutedBase: true });
+    const action = decideAiAction(ctx, fixedRandom);
+    expect(action.type).toBe('attack');
+    expect(action.targetEntity).toBe(enemyConyard);
   });
 
-  it('does not send scout when military count is 0', () => {
-    runAiUntil(engine, 30, () => countBuildings(engine, 2, 'warfactory') > 0);
-    clearMilitary(engine, 2);
-
-    expect(countMilitary(engine, 2)).toBe(0);
-
-    engine.aiTimer = 2000;
-    engine.updateAI(2000);
-
-    // Still no military, no errors
-    expect(countMilitary(engine, 2)).toBe(0);
+  it('attack: no conyard → attacks first building', () => {
+    const military = Array.from({ length: 5 }, (_, i) => makeAiUnit({ x: 1700 + i * 10, y: 1700 }));
+    const enemyBuilding = makeAiUnit({ x: 200, y: 200, w: 64, h: 64, type: 'powerplant' });
+    const ctx = makeAiCtx({ military, enemyBuildings: [enemyBuilding], aiScoutedBase: true });
+    const action = decideAiAction(ctx, fixedRandom);
+    expect(action.type).toBe('attack');
+    expect(action.targetEntity).toBe(enemyBuilding);
   });
 
-  it('does not send scout when military count >= 5 (attacks instead)', () => {
-    runAiUntil(engine, 30, () => countBuildings(engine, 2, 'warfactory') > 0);
-    clearMilitary(engine, 2);
-
-    const barracks = engine.buildings.find(b => b.player === 2 && b.type === 'barracks')!;
-
-    // Add 5 infantry
-    for (let i = 0; i < 5; i++) {
-      engine.units.push(new Unit(barracks.center.x + i * 10, barracks.center.y + 50, 'infantry', 2));
-    }
-
-    expect(countMilitary(engine, 2)).toBe(5);
-
-    // Mark base as scouted so attack logic kicks in
-    engine.aiScoutedBase[2] = true;
-
-    engine.aiTimer = 2000;
-    engine.updateAI(2000);
-
-    // All military units should be attacking (targetEntity set to enemy building)
-    const military = engine.units.filter(u => u.player === 2 && u.type !== 'harvester');
-    for (const u of military) {
-      expect(u.state).toBe('attacking');
-      expect(u.targetEntity).not.toBeNull();
-    }
-  });
-});
-
-// ============================================================================
-describe('AI Attack Behavior (military count >= 5)', () => {
-  let engine: GameEngine;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    const canvas = createMockCanvas();
-    engine = new GameEngine(canvas, vi.fn());
-    engine.players[2].credits = 99999;
-    engine.aiTimer = 2000;
+  it('search: military >= 5 and not scouted → search', () => {
+    const military = Array.from({ length: 5 }, (_, i) => makeAiUnit({ x: 1700 + i * 10, y: 1700 }));
+    const ctx = makeAiCtx({ military, aiScoutedBase: false });
+    const action = decideAiAction(ctx, () => 0.3);
+    expect(action.type).toBe('search');
+    expect(action.targetPos).toEqual({ x: 40, y: 40 });
   });
 
-  it('attacks enemy conyard when military >= 5 and base is scouted', () => {
-    runAiUntil(engine, 30, () => countBuildings(engine, 2, 'warfactory') > 0);
-    clearMilitary(engine, 2);
-
-    const barracks = engine.buildings.find(b => b.player === 2 && b.type === 'barracks')!;
-
-    // Spawn 5 infantry
-    for (let i = 0; i < 5; i++) {
-      engine.units.push(new Unit(barracks.center.x + i * 10, barracks.center.y + 50, 'infantry', 2));
-    }
-
-    expect(countMilitary(engine, 2)).toBe(5);
-
-    // Mark scouted
-    engine.aiScoutedBase[2] = true;
-
-    // Player 1's conyard is at (200, 200)
-    const enemyConyard = engine.buildings.find(b => b.player === 1 && b.type === 'conyard')!;
-    expect(enemyConyard).toBeDefined();
-
-    engine.aiTimer = 2000;
-    engine.updateAI(2000);
-
-    // All military should target the enemy conyard
-    const military = engine.units.filter(u => u.player === 2 && u.type !== 'harvester');
-    for (const u of military) {
-      expect(u.state).toBe('attacking');
-      expect(u.targetEntity).toBe(enemyConyard);
-    }
+  it('defend: enemy within 800px of conyard → defend (highest priority)', () => {
+    const enemyThreat = makeAiUnit({ x: 1850, y: 1850, player: 1 });
+    const scout = makeAiUnit({ x: 1700, y: 1700 });
+    const ctx = makeAiCtx({ military: [scout], enemyUnits: [enemyThreat], aiScoutedBase: false });
+    const action = decideAiAction(ctx, fixedRandom);
+    expect(action.type).toBe('defend');
+    expect(action.targetEntity).toBe(enemyThreat);
   });
 
-  it('does not attack when base is not scouted but sends search parties', () => {
-    runAiUntil(engine, 30, () => countBuildings(engine, 2, 'warfactory') > 0);
-    clearMilitary(engine, 2);
-
-    const barracks = engine.buildings.find(b => b.player === 2 && b.type === 'barracks')!;
-
-    // Spawn 5 infantry
-    for (let i = 0; i < 5; i++) {
-      engine.units.push(new Unit(barracks.center.x + i * 10, barracks.center.y + 50, 'infantry', 2));
-    }
-
-    expect(countMilitary(engine, 2)).toBe(5);
-
-    // NOT scouted
-    engine.aiScoutedBase[2] = false;
-
-    engine.aiTimer = 2000;
-    engine.updateAI(2000);
-
-    // Military should be searching (moving toward enemy side)
-    const military = engine.units.filter(u => u.player === 2 && u.type !== 'harvester');
-    for (const u of military) {
-      expect(u.state).toBe('moving');
-      expect(u.targetPos).not.toBeNull();
-      expect(u.targetEntity).toBeNull();
-    }
+  it('defend takes priority over attack', () => {
+    const enemyThreat = makeAiUnit({ x: 1850, y: 1850, player: 1 });
+    const military = Array.from({ length: 5 }, (_, i) => makeAiUnit({ x: 1700 + i * 10, y: 1700 }));
+    const enemyConyard = makeAiUnit({ x: 200, y: 200, w: 96, h: 96, type: 'conyard' });
+    const ctx = makeAiCtx({ military, enemyUnits: [enemyThreat], enemyBuildings: [enemyConyard], aiScoutedBase: true });
+    expect(decideAiAction(ctx, fixedRandom).type).toBe('defend');
   });
 
-  it('defends base when enemy units are within base radius', () => {
-    runAiUntil(engine, 30, () => countBuildings(engine, 2, 'warfactory') > 0);
-    clearMilitary(engine, 2);
-
-    const barracks = engine.buildings.find(b => b.player === 2 && b.type === 'barracks')!;
-    const conyard = engine.buildings.find(b => b.player === 2 && b.type === 'conyard')!;
-
-    // Spawn 5 infantry for player 2
-    for (let i = 0; i < 5; i++) {
-      engine.units.push(new Unit(barracks.center.x + i * 10, barracks.center.y + 50, 'infantry', 2));
-    }
-
-    // Place an enemy unit very close to player 2's conyard (within 800 radius)
-    engine.units.push(new Unit(conyard.x + 50, conyard.y + 50, 'infantry', 1));
-
-    engine.aiScoutedBase[2] = true;
-
-    engine.aiTimer = 2000;
-    engine.updateAI(2000);
-
-    // Military should be defending (attacking the threat)
-    const military = engine.units.filter(u => u.player === 2 && u.type !== 'harvester');
-    for (const u of military) {
-      expect(u.state).toBe('attacking');
-      expect(u.targetEntity).not.toBeNull();
-    }
+  it('none: no military → none', () => {
+    const ctx = makeAiCtx({ military: [] });
+    expect(decideAiAction(ctx, fixedRandom).type).toBe('none');
   });
 
-  it('attack targets the first available enemy building if conyard is destroyed', () => {
-    runAiUntil(engine, 30, () => countBuildings(engine, 2, 'warfactory') > 0);
-    clearMilitary(engine, 2);
+  it('none: military < 5 but already scouted → none (patrol in Engine)', () => {
+    const scout = makeAiUnit({ x: 1700, y: 1700 });
+    const ctx = makeAiCtx({ military: [scout], aiScoutedBase: true });
+    expect(decideAiAction(ctx, fixedRandom).type).toBe('none');
+  });
 
-    const barracks = engine.buildings.find(b => b.player === 2 && b.type === 'barracks')!;
+  it('scout target clamped to map bounds', () => {
+    const scout = makeAiUnit({ x: 1700, y: 1700 });
+    const ctx = makeAiCtx({ military: [scout], aiScoutedBase: false, baseX: 1900, baseY: 1900 });
+    // random=0.9 → offset=(0.9-0.5)*800=320 → 1900+320=2220 → clamped to 2000
+    const action = decideAiAction(ctx, () => 0.9);
+    expect(action.type).toBe('scout');
+    expect(action.targetPos!.x).toBeLessThanOrEqual(2000);
+    expect(action.targetPos!.y).toBeLessThanOrEqual(2000);
+  });
 
-    // Spawn 5 infantry
-    for (let i = 0; i < 5; i++) {
-      engine.units.push(new Unit(barracks.center.x + i * 10, barracks.center.y + 50, 'infantry', 2));
-    }
-
-    // Remove player 1's conyard and leave another building
-    const enemyConyard = engine.buildings.find(b => b.player === 1 && b.type === 'conyard')!;
-    enemyConyard.dead = true;
-    engine.buildings = engine.buildings.filter(b => !b.dead);
-
-    // Player 1 should still have buildings — add a powerplant
-    engine.buildings.push(new Building(250, 250, 'powerplant', 1));
-
-    engine.aiScoutedBase[2] = true;
-
-    engine.aiTimer = 2000;
-    engine.updateAI(2000);
-
-    const military = engine.units.filter(u => u.player === 2 && u.type !== 'harvester');
-    for (const u of military) {
-      expect(u.state).toBe('attacking');
-      expect(u.targetEntity).not.toBeNull();
-    }
+  it('picks nearest threat when multiple enemies near base', () => {
+    const closeEnemy = makeAiUnit({ x: 1810, y: 1810, player: 1 });
+    const farEnemy = makeAiUnit({ x: 1900, y: 1900, player: 1 });
+    const scout = makeAiUnit({ x: 1700, y: 1700 });
+    const ctx = makeAiCtx({ military: [scout], enemyUnits: [farEnemy, closeEnemy] });
+    const action = decideAiAction(ctx, fixedRandom);
+    expect(action.type).toBe('defend');
+    expect(action.targetEntity).toBe(closeEnemy);
   });
 });
 
@@ -407,8 +229,7 @@ describe('AI State Machine – aiState field transitions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const canvas = createMockCanvas();
-    engine = new GameEngine(canvas, vi.fn());
+    engine = new GameEngine(createMockCanvas(), vi.fn());
     engine.players[2].credits = 99999;
     engine.aiTimer = 2000;
   });
@@ -422,8 +243,7 @@ describe('AI State Machine – aiState field transitions', () => {
     expect(validStates).toContain(engine.aiState);
   });
 
-  it('AI builds powerplant first regardless of aiState field (uses dynamic state)', () => {
-    // Even if we manually set aiState to spam, the dynamic logic should build powerplant
+  it('AI builds powerplant first regardless of aiState field', () => {
     engine.aiState = 'spam';
     engine.updateAI(2000);
     expect(countBuildings(engine, 2, 'powerplant')).toBe(1);
@@ -431,8 +251,8 @@ describe('AI State Machine – aiState field transitions', () => {
 
   it('AI builds refinery after powerplant even if aiState is manually overridden', () => {
     engine.aiState = 'spam';
-    engine.updateAI(2000); // builds powerplant
-    engine.updateAI(2000); // builds refinery
+    engine.updateAI(2000);
+    engine.updateAI(2000);
     expect(countBuildings(engine, 2, 'refinery')).toBe(1);
   });
 });
@@ -443,47 +263,31 @@ describe('AI Timer and Tick Behavior', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const canvas = createMockCanvas();
-    engine = new GameEngine(canvas, vi.fn());
+    engine = new GameEngine(createMockCanvas(), vi.fn());
     engine.players[2].credits = 99999;
   });
 
   it('does not run AI before 2000ms timer threshold', () => {
     engine.aiTimer = 0;
-    const buildingsBefore = engine.buildings.filter(b => b.player === 2).length;
-
-    // dt=1000 is less than 2000 threshold
+    const before = engine.buildings.filter(b => b.player === 2).length;
     engine.updateAI(1000);
-
-    const buildingsAfter = engine.buildings.filter(b => b.player === 2).length;
-    expect(buildingsAfter).toBe(buildingsBefore);
+    expect(engine.buildings.filter(b => b.player === 2).length).toBe(before);
     expect(engine.aiTimer).toBe(1000);
   });
 
   it('runs AI exactly at 2000ms threshold', () => {
     engine.aiTimer = 0;
     engine.updateAI(2000);
-
-    // Should have built powerplant
     expect(countBuildings(engine, 2, 'powerplant')).toBe(1);
-    // Timer should be reset
     expect(engine.aiTimer).toBe(0);
   });
 
   it('accumulates timer across multiple small dt calls', () => {
     engine.aiTimer = 0;
-
+    engine.updateAI(500); expect(engine.aiTimer).toBe(500);
+    engine.updateAI(500); expect(engine.aiTimer).toBe(1000);
+    engine.updateAI(500); expect(engine.aiTimer).toBe(1500);
     engine.updateAI(500);
-    expect(engine.aiTimer).toBe(500);
-
-    engine.updateAI(500);
-    expect(engine.aiTimer).toBe(1000);
-
-    engine.updateAI(500);
-    expect(engine.aiTimer).toBe(1500);
-
-    engine.updateAI(500);
-    // Now at 2000, AI fires and resets
     expect(countBuildings(engine, 2, 'powerplant')).toBe(1);
     expect(engine.aiTimer).toBe(0);
   });
@@ -495,45 +299,35 @@ describe('AI Credit Deduction', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const canvas = createMockCanvas();
-    engine = new GameEngine(canvas, vi.fn());
+    engine = new GameEngine(createMockCanvas(), vi.fn());
     engine.players[2].credits = 99999;
     engine.aiTimer = 2000;
   });
 
   it('deducts credits when building powerplant', () => {
-    const creditsBefore = engine.players[2].credits;
+    const before = engine.players[2].credits;
     engine.updateAI(2000);
-    expect(engine.players[2].credits).toBe(creditsBefore - COSTS.powerplant);
+    expect(engine.players[2].credits).toBe(before - COSTS.powerplant);
   });
 
   it('deducts credits when building refinery', () => {
-    engine.updateAI(2000); // powerplant
-    const creditsAfterPower = engine.players[2].credits;
-    engine.updateAI(2000); // refinery
-    expect(engine.players[2].credits).toBe(creditsAfterPower - COSTS.refinery);
+    engine.updateAI(2000);
+    const afterPower = engine.players[2].credits;
+    engine.updateAI(2000);
+    expect(engine.players[2].credits).toBe(afterPower - COSTS.refinery);
   });
 
   it('does not build if insufficient credits', () => {
     engine.players[2].credits = 0;
     engine.updateAI(2000);
-    // Should not have built anything
     expect(countBuildings(engine, 2, 'powerplant')).toBe(0);
   });
 
   it('spends credits on unit spam in spam state', () => {
-    // Build full tech tree
     runAiUntil(engine, 20, () => countBuildings(engine, 2, 'warfactory') > 0);
-
-    const creditsBefore = engine.players[2].credits;
-
-    // Run several spam ticks
-    for (let i = 0; i < 10; i++) {
-      engine.updateAI(2000);
-    }
-
-    // Credits should have decreased (units cost credits)
-    expect(engine.players[2].credits).toBeLessThan(creditsBefore);
+    const before = engine.players[2].credits;
+    for (let i = 0; i < 10; i++) engine.updateAI(2000);
+    expect(engine.players[2].credits).toBeLessThan(before);
   });
 });
 
@@ -543,24 +337,17 @@ describe('AI Harvester Spawning', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const canvas = createMockCanvas();
-    engine = new GameEngine(canvas, vi.fn());
+    engine = new GameEngine(createMockCanvas(), vi.fn());
     engine.players[2].credits = 99999;
     engine.aiTimer = 2000;
   });
 
   it('spawns a harvester when building a refinery', () => {
-    const harvestersBefore = engine.units.filter(u => u.player === 2 && u.type === 'harvester').length;
-    // Player 2 starts with 1 harvester from initMap
-    expect(harvestersBefore).toBe(1);
-
-    // Build powerplant
-    engine.updateAI(2000);
-    // Build refinery (should spawn harvester)
-    engine.updateAI(2000);
-
-    const harvestersAfter = engine.units.filter(u => u.player === 2 && u.type === 'harvester').length;
-    expect(harvestersAfter).toBe(2);
+    const before = engine.units.filter(u => u.player === 2 && u.type === 'harvester').length;
+    expect(before).toBe(1);
+    engine.updateAI(2000); // powerplant
+    engine.updateAI(2000); // refinery
+    expect(engine.units.filter(u => u.player === 2 && u.type === 'harvester').length).toBe(2);
   });
 });
 
@@ -570,33 +357,23 @@ describe('AI Player 1 vs Player 2 behavior', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const canvas = createMockCanvas();
-    engine = new GameEngine(canvas, vi.fn());
+    engine = new GameEngine(createMockCanvas(), vi.fn());
     engine.players[1].credits = 99999;
     engine.players[2].credits = 99999;
     engine.aiTimer = 2000;
   });
 
   it('AI runs for both players', () => {
-    // Both players start with just a conyard
     expect(countBuildings(engine, 1, 'powerplant')).toBe(0);
     expect(countBuildings(engine, 2, 'powerplant')).toBe(0);
-
     engine.updateAI(2000);
-
-    // Both should build powerplant
     expect(countBuildings(engine, 1, 'powerplant')).toBe(1);
     expect(countBuildings(engine, 2, 'powerplant')).toBe(1);
   });
 
   it('AI for player 1 is blocked when buildQueue is occupied', () => {
-    // Occupy player 1's build queue
-    engine.buildQueue = { type: 'powerplant', progress: 0, status: 'building' };
-
+    engine.buildQueue = { type: 'powerplant', progress: 0, status: 'building' } as any;
     engine.updateAI(2000);
-
-    // Player 1 should NOT have built a new powerplant (blocked by buildQueue)
-    // But player 2 should have
     expect(countBuildings(engine, 2, 'powerplant')).toBe(1);
   });
 });

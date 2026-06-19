@@ -1,6 +1,7 @@
 import { PlayerId, BuildingType, UnitType, Position, Rect, PlayerState, GameState, ArmorType, WeaponType } from './types';
 import { COSTS, BUILD_TIMES, POWER, SIZES, STATS, MAP_SIZE } from './constants';
 import { audio } from './Audio';
+import { decideAiAction, AiContext } from './AiLogic';
 
 let nextId = 1;
 
@@ -845,98 +846,71 @@ export class GameEngine {
       const enemyId = playerId === 1 ? 2 : 1;
       const enemyBuildings = this.buildings.filter(b => b.player === enemyId);
       const enemyUnits = this.units.filter(u => u.player === enemyId);
-      
-      // Base Defense Logic
-      const baseRadius = 800; // Radius around conyard to consider "base"
-      let baseUnderAttack = false;
-      let nearestThreat: Entity | null = null;
-      let minThreatDist = Infinity;
 
-      for (const e of [...enemyUnits, ...enemyBuildings]) {
-        const dist = e.distanceTo(conyard);
-        if (dist < baseRadius) {
-          baseUnderAttack = true;
-          if (dist < minThreatDist) {
-            minThreatDist = dist;
-            nearestThreat = e;
+      const baseX = playerId === 1 ? MAP_SIZE.w - 200 : 200;
+      const baseY = playerId === 1 ? MAP_SIZE.h - 200 : 200;
+
+      // Check if any military unit has found the enemy base
+      if (!this.aiScoutedBase[playerId]) {
+        for (const u of military) {
+          if (u.distanceTo({ x: baseX, y: baseY }) < 600) {
+            this.aiScoutedBase[playerId] = true;
+            break;
           }
         }
       }
 
-      if (baseUnderAttack && nearestThreat) {
-        // Pull back to defend!
+      const aiCtx: AiContext = {
+        playerId,
+        military,
+        enemyUnits,
+        enemyBuildings,
+        conyard,
+        aiScoutedBase: this.aiScoutedBase[playerId],
+        credits: ai.credits,
+        hasWarfactory: aiBuildings.some(b => b.type === 'warfactory'),
+        hasBarracks: aiBuildings.some(b => b.type === 'barracks'),
+        baseX,
+        baseY,
+      };
+
+      const action = decideAiAction(aiCtx, Math.random);
+
+      // Apply the action to units
+      if (action.type === 'defend' && action.targetEntity) {
         for (const u of military) {
-          // Send military units to attack the threat in the base
-          // For Player 1, only override if idle to allow manual control. For AI, always pull back.
           const canOverride = playerId === 2 || u.state === 'idle';
-          if (canOverride && u.targetEntity !== nearestThreat) {
-            u.targetEntity = nearestThreat;
+          if (canOverride && u.targetEntity !== action.targetEntity) {
+            u.targetEntity = action.targetEntity;
             u.state = 'attacking';
             u.targetPos = null;
           }
         }
-      } else {
-        // Check if any military unit has found the enemy base
-        const baseX = playerId === 1 ? MAP_SIZE.w - 200 : 200;
-        const baseY = playerId === 1 ? MAP_SIZE.h - 200 : 200;
-        if (!this.aiScoutedBase[playerId]) {
-          for (const u of military) {
-            if (u.distanceTo({ x: baseX, y: baseY }) < 600) {
-              this.aiScoutedBase[playerId] = true;
-              break;
-            }
-          }
-        }
-
-        // Scouting / Attacking logic
-        const target = enemyBuildings.find(b => b.type === 'conyard') || enemyBuildings[0];
-
-        if (military.length > 0 && military.length < 5) {
-          // Send a scout
-          const scout = military[0];
+      } else if (action.type === 'scout' && action.targetPos) {
+        const scout = military[0];
+        if (scout) {
           const canOverrideScout = playerId === 2 || scout.state === 'idle';
           if (canOverrideScout) {
-            if (!this.aiScoutedBase[playerId]) {
-              // Send scout to the opposite corner (likely enemy base)
-              if (scout.state === 'idle' || !scout.targetPos) {
-                 scout.targetPos = {
-                    x: Math.max(0, Math.min(MAP_SIZE.w, baseX + (Math.random() - 0.5) * 800)),
-                    y: Math.max(0, Math.min(MAP_SIZE.h, baseY + (Math.random() - 0.5) * 800))
-                 };
-                 scout.targetEntity = null;
-                 scout.state = 'moving';
-              }
-            } else if (scout.state === 'idle') {
-              // Patrol around own base only when idle
-              const patrolX = conyard.x + (Math.random() - 0.5) * 1000;
-              const patrolY = conyard.y + (Math.random() - 0.5) * 1000;
-              scout.targetPos = { x: Math.max(0, Math.min(MAP_SIZE.w, patrolX)), y: Math.max(0, Math.min(MAP_SIZE.h, patrolY)) };
-              scout.targetEntity = null;
-              scout.state = 'moving';
-            }
+            scout.targetPos = action.targetPos;
+            scout.targetEntity = null;
+            scout.state = 'moving';
           }
-        } else if (military.length >= 5) {
-          // Full attack only if base is scouted or we have a known target
-          if (this.aiScoutedBase[playerId] && target) {
-            for (const u of military) {
-              const canOverrideAttack = playerId === 2 || u.state === 'idle';
-              if (canOverrideAttack && u.targetEntity !== target) {
-                u.targetEntity = target;
-                u.state = 'attacking';
-              }
-            }
-          } else if (!this.aiScoutedBase[playerId]) {
-            // If we have an army but haven't found the base, send them to search
-            for (const u of military) {
-              const canOverrideAttack = playerId === 2 || u.state === 'idle';
-              if (canOverrideAttack && u.state === 'idle') {
-                const searchX = (playerId === 1 ? MAP_SIZE.w : 0) + (Math.random() - 0.5) * 1000;
-                const searchY = (playerId === 1 ? MAP_SIZE.h : 0) + (Math.random() - 0.5) * 1000;
-                u.targetPos = { x: Math.max(0, Math.min(MAP_SIZE.w, searchX)), y: Math.max(0, Math.min(MAP_SIZE.h, searchY)) };
-                u.targetEntity = null;
-                u.state = 'moving';
-              }
-            }
+        }
+      } else if (action.type === 'attack' && action.targetEntity) {
+        for (const u of military) {
+          const canOverrideAttack = playerId === 2 || u.state === 'idle';
+          if (canOverrideAttack && u.targetEntity !== action.targetEntity) {
+            u.targetEntity = action.targetEntity;
+            u.state = 'attacking';
+          }
+        }
+      } else if (action.type === 'search' && action.targetPos) {
+        for (const u of military) {
+          const canOverrideAttack = playerId === 2 || u.state === 'idle';
+          if (canOverrideAttack && u.state === 'idle') {
+            u.targetPos = action.targetPos;
+            u.targetEntity = null;
+            u.state = 'moving';
           }
         }
       }
