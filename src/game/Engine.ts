@@ -890,7 +890,7 @@ export class GameEngine {
 
         // Scouting / Attacking logic
         const target = enemyBuildings.find(b => b.type === 'conyard') || enemyBuildings[0];
-        
+
         if (military.length > 0 && military.length < 5) {
           // Send a scout
           const scout = military[0];
@@ -899,9 +899,9 @@ export class GameEngine {
             if (!this.aiScoutedBase[playerId]) {
               // Send scout to the opposite corner (likely enemy base)
               if (scout.state === 'idle' || !scout.targetPos) {
-                 scout.targetPos = { 
-                    x: Math.max(0, Math.min(MAP_SIZE.w, baseX + (Math.random() - 0.5) * 800)), 
-                    y: Math.max(0, Math.min(MAP_SIZE.h, baseY + (Math.random() - 0.5) * 800)) 
+                 scout.targetPos = {
+                    x: Math.max(0, Math.min(MAP_SIZE.w, baseX + (Math.random() - 0.5) * 800)),
+                    y: Math.max(0, Math.min(MAP_SIZE.h, baseY + (Math.random() - 0.5) * 800))
                  };
                  scout.targetEntity = null;
                  scout.state = 'moving';
