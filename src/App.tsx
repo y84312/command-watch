@@ -3,9 +3,9 @@ import { GameEngine } from './game/Engine';
 import { GameState, BuildingType, UnitType } from './game/types';
 import { COSTS, BUILD_TIMES } from './game/constants';
 import { audio } from './game/Audio';
-import { Zap, Coins, Hammer, Crosshair, Factory, Shield, Battery, Tractor, Users } from 'lucide-react';
+import { Zap, Coins, Hammer, Crosshair, Factory, Shield, Battery, Tractor, Users, type LucideIcon } from 'lucide-react';
 
-const STRUCTURES: { type: BuildingType; label: string; icon: any }[] = [
+const STRUCTURES: { type: BuildingType; label: string; icon: LucideIcon }[] = [
   { type: 'powerplant', label: 'Power Plant', icon: Battery },
   { type: 'refinery', label: 'Ore Refinery', icon: Factory },
   { type: 'barracks', label: 'Barracks', icon: Shield },
@@ -13,7 +13,7 @@ const STRUCTURES: { type: BuildingType; label: string; icon: any }[] = [
   { type: 'turret', label: 'Defense Turret', icon: Crosshair },
 ];
 
-const UNITS: { type: UnitType; label: string; icon: any }[] = [
+const UNITS: { type: UnitType; label: string; icon: LucideIcon }[] = [
   { type: 'harvester', label: 'Harvester', icon: Tractor },
   { type: 'infantry', label: 'Infantry', icon: Users },
   { type: 'tank', label: 'Light Tank', icon: Crosshair },
@@ -184,7 +184,17 @@ export default function App() {
   );
 }
 
-function BuildButton({ item, cost, time, engine, gameState, playerCredits, unlocked = true }: any) {
+interface BuildButtonProps {
+  item: { type: BuildingType | UnitType; label: string; icon: LucideIcon };
+  cost: number;
+  time: number;
+  engine: GameEngine | null;
+  gameState: GameState;
+  playerCredits: number;
+  unlocked?: boolean;
+}
+
+function BuildButton({ item, cost, time, engine, gameState, playerCredits, unlocked = true }: BuildButtonProps) {
   const isBuildingThis = gameState.buildQueue?.type === item.type;
   const isBuildingOther = gameState.buildQueue && !isBuildingThis;
   const isReady = isBuildingThis && gameState.buildQueue.status === 'ready';

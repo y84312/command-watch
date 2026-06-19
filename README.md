@@ -1,20 +1,32 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Command Watch
 
-# Run and deploy your AI Studio app
+Strateegiamäng kahe arvuti vahel — Command & Conquer stiilis reaalajas strateegia (RTS) mäng, kus saad üle võtta mängu käigus.
 
-This contains everything you need to run your app locally.
+![TypeScript](https://img.shields.io/badge/TypeScript-5+-blue.svg)
+![React](https://img.shields.io/badge/React-18+-61DAFB.svg)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
-View your app in AI Studio: https://ai.studio/apps/72b7fbee-dd97-4deb-b67f-9ace5c8e0d92
+## Funktsioonid
 
-## Run Locally
+- **RTS mäng** — Command & Conquer stiilis üksused ja ehitised
+- **AI vastane** — arvuti mängib vastu täieliku strateegiaga
+- **Pimeduse sõud (Fog of War)** — näed ainult oma üksuste lähedal
+- **Resursside haldus** — kogu malts, ehituse, tootmine
+- **Audio** — heliefektid ja muusika
 
-**Prerequisites:**  Node.js
+## Mängu struktuur
 
+- **Ehitised:** Power Plant, Ore Refinery, Barracks, War Factory, Defense Turret
+- **Üksused:** Harvester, Infantry, Light Tank
+- **Eesmärk:** Hävita vastase Command Center
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Käivitus
+
+```bash
+npm install
+npm run dev
+```
+
+## Litsents
+
+MIT
