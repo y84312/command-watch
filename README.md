@@ -1,32 +1,85 @@
 # Command Watch
 
-Strateegiamäng kahe arvuti vahel — Command & Conquer stiilis reaalajas strateegia (RTS) mäng, kus saad üle võtta mängu käigus.
+[![CI](https://github.com/stennu718/command-watch/actions/workflows/tests.yml/badge.svg)](https://github.com/stennu718/command-watch/actions/workflows/tests.yml)
+[![Docker](https://github.com/stennu718/command-watch/actions/workflows/docker.yml/badge.svg)](https://github.com/stennu718/command-watch/actions/workflows/docker.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-![TypeScript](https://img.shields.io/badge/TypeScript-5+-blue.svg)
-![React](https://img.shields.io/badge/React-18+-61DAFB.svg)
-![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+![Gameplay](docs/screenshot.png)
 
-## Funktsioonid
+## Description
 
-- **RTS mäng** — Command & Conquer stiilis üksused ja ehitised
-- **AI vastane** — arvuti mängib vastu täieliku strateegiaga
-- **Pimeduse sõud (Fog of War)** — näed ainult oma üksuste lähedal
-- **Resursside haldus** — kogu malts, ehituse, tootmine
-- **Audio** — heliefektid ja muusika
+Command Watch is a real-time strategy (RTS) game inspired by the classic Command & Conquer series. Build your base, manage resources, and destroy your opponent's Command Center — all in real-time. Play against another human or challenge the built-in AI opponent.
 
-## Mängu struktuur
+## Features
 
-- **Ehitised:** Power Plant, Ore Refinery, Barracks, War Factory, Defense Turret
-- **Üksused:** Harvester, Infantry, Light Tank
-- **Eesmärk:** Hävita vastase Command Center
+- **Real-time strategy gameplay** — Classic RTS mechanics with units, buildings, and base management
+- **AI opponent** — A fully strategic computer player that challenges you with complete game logic
+- **Fog of War** — Only see areas near your units; the map reveals itself as you explore
+- **Resource management** — Collect ore, build structures, and manage production chains
+- **Audio** — Sound effects and background music for an immersive experience
 
-## Käivitus
+## How to Play
+
+### Buildings
+
+- **Power Plant** — Provides power to your base
+- **Ore Refinery** — Processes harvested ore into resources
+- **Barracks** — Trains infantry units
+- **War Factory** — Produces vehicles and heavy units
+- **Defense Turret** — Automatically attacks nearby enemies
+
+### Units
+
+- **Harvester** — Collects ore and delivers it to the refinery
+- **Infantry** — Basic foot soldiers
+- **Light Tank** — Fast armored vehicle
+
+### Objective
+
+Destroy the enemy's **Command Center** to win the game. Manage your economy, build your army, and strike before they do.
+
+## Quick Start
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Litsents
+The game will be available at `http://localhost:3000`.
 
-MIT
+## Tech Stack
+
+- **Language:** TypeScript 5+
+- **Framework:** React 19
+- **Build Tool:** Vite 6
+- **Testing:** Vitest
+- **Styling:** Tailwind CSS 4
+- **CI/CD:** GitHub Actions
+- **Deployment:** Docker
+
+## Project Structure
+
+```
+command-watch/
+├── src/
+│   ├── game/
+│   │   ├── Engine.ts      # Core game engine and state management
+│   │   ├── AiLogic.ts     # AI opponent decision-making
+│   │   ├── entities.ts    # Game entity definitions
+│   │   ├── types.ts       # TypeScript type definitions
+│   │   ├── constants.ts   # Game constants and configuration
+│   │   └── Audio.ts       # Audio system
+│   ├── App.tsx            # Main application component
+│   ├── main.tsx           # Entry point
+│   └── index.css          # Global styles
+├── tests/                 # Unit and integration tests
+├── .github/workflows/     # CI/CD pipelines
+├── Dockerfile             # Container configuration
+├── vite.config.ts         # Vite configuration
+├── vitest.config.ts       # Vitest configuration
+└── tsconfig.json          # TypeScript configuration
+```
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
