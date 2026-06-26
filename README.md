@@ -1,10 +1,7 @@
 # Command Watch
 
 [![CI](https://github.com/stennu718/command-watch/actions/workflows/tests.yml/badge.svg)](https://github.com/stennu718/command-watch/actions/workflows/tests.yml)
-[![Docker](https://github.com/stennu718/command-watch/actions/workflows/docker.yml/badge.svg)](https://github.com/stennu718/command-watch/actions/workflows/docker.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-![Gameplay](docs/screenshot.png)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Description
 
@@ -79,6 +76,14 @@ command-watch/
 ├── vitest.config.ts       # Vitest configuration
 └── tsconfig.json          # TypeScript configuration
 ```
+
+## Screenshots
+
+![Gameplay](docs/screenshot-gameplay.png)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## License
 
