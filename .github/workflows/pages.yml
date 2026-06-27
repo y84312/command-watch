@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages-command-watch-2026"
+  group: "pages-command-watch-2026-v2"
   cancel-in-progress: true
 
 jobs:
