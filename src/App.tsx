@@ -24,6 +24,8 @@ export default function App() {
   const [engine, setEngine] = useState<GameEngine | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [activeTab, setActiveTab] = useState<'structures' | 'units'>('structures');
+  const [demoMode, setDemoMode] = useState(false);
+  const [winner, setWinner] = useState<PlayerId | null>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -46,6 +48,23 @@ export default function App() {
     };
   }, []);
 
+  // Demo mode: AI vs AI spectator
+  const startDemo = () => {
+    setDemoMode(true);
+    setWinner(null);
+    if (engine) {
+      engine.startDemo();
+    }
+  };
+
+  const stopDemo = () => {
+    setDemoMode(false);
+    setWinner(null);
+    if (engine) {
+      engine.stopDemo();
+    }
+  };
+
   const player = gameState?.players[1];
   const powerWarning = player ? player.power > player.maxPower : false;
 
@@ -66,6 +85,39 @@ export default function App() {
           className="block w-full h-full cursor-crosshair"
           onContextMenu={(e) => e.preventDefault()}
         />
+
+        {/* Demo Mode Banner */}
+        {demoMode && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-red-900/90 border border-red-500 px-6 py-2 rounded-lg">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+                <span className="text-red-300 font-bold text-sm uppercase tracking-wider">AI Battle Live</span>
+              </div>
+              <button
+                onClick={stopDemo}
+                className="text-xs bg-red-800 hover:bg-red-700 px-3 py-1 rounded text-red-200 font-bold"
+              >
+                STOP
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Start Demo Button */}
+        {!demoMode && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50">
+            <button
+              onClick={startDemo}
+              className="bg-emerald-900/90 hover:bg-emerald-800 border border-emerald-500 px-6 py-3 rounded-lg text-emerald-300 font-bold text-sm uppercase tracking-wider transition-all hover:scale-105 shadow-lg shadow-emerald-900/50"
+            >
+              ▶ Watch AI vs AI
+            </button>
+          </div>
+        )}
         
         {!gameState && (
           <div className="absolute inset-0 bg-zinc-900 flex items-center justify-center z-50">

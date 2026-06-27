@@ -284,6 +284,52 @@ export class GameEngine {
     this.running = false;
   }
 
+  // Demo mode: AI vs AI with faster game speed
+  demoActive = false;
+  demoSpeed = 3; // 3x speed
+
+  startDemo() {
+    this.demoActive = true;
+    this.demoSpeed = 3;
+    // Reset game state for demo
+    this.players = {
+      1: { id: 1, credits: 5000, power: 0, maxPower: 0, color: '#3b82f6' },
+      2: { id: 2, credits: 5000, power: 0, maxPower: 0, color: '#ef4444' },
+    };
+    this.buildings = [];
+    this.units = [];
+    this.ores = [];
+    this.projectiles = [];
+    this.aiState = 'build_power';
+    this.aiTimer = 0;
+    // Spawn initial buildings for both players
+    this.buildings.push(
+      { id: 1, type: 'commandcenter' as BuildingType, player: 1, x: 100, y: 300, hp: 1000, maxHp: 1000, w: 40, h: 40, center: { x: 120, y: 320 } },
+      { id: 2, type: 'commandcenter' as BuildingType, player: 2, x: 1400, y: 300, hp: 1000, maxHp: 1000, w: 40, h: 40, center: { x: 1420, y: 320 } }
+    );
+    // Spawn ore patches
+    for (let i = 0; i < 8; i++) {
+      this.ores.push({
+        id: 100 + i,
+        x: 300 + Math.random() * 900,
+        y: 150 + Math.random() * 400,
+        amount: 5000
+      } as Ore);
+    }
+  }
+
+  stopDemo() {
+    this.demoActive = false;
+  }
+
+  checkWinner(): PlayerId | null {
+    const p1HasBase = this.buildings.some(b => b.player === 1 && b.type === 'commandcenter');
+    const p2HasBase = this.buildings.some(b => b.player === 2 && b.type === 'commandcenter');
+    if (!p1HasBase) return 2;
+    if (!p2HasBase) return 1;
+    return null;
+  }
+
   loop(time: number) {
     if (!this.running) return;
     const dt = time - this.lastTime;
@@ -625,11 +671,21 @@ export class GameEngine {
 
   updateAI(dt: number) {
     this.aiTimer += dt;
-    if (this.aiTimer < 2000) return; // Run AI every 2s
+    const interval = this.demoActive ? 500 : 2000; // Faster AI in demo mode
+    if (this.aiTimer < interval) return;
     this.aiTimer = 0;
 
     this.runAIForPlayer(1);
     this.runAIForPlayer(2);
+
+    // Check winner in demo mode
+    if (this.demoActive) {
+      const winner = this.checkWinner();
+      if (winner) {
+        this.demoActive = false;
+        this.onStateChange({ ...this.buildings, winner } as any);
+      }
+    }
   }
 
   runAIForPlayer(playerId: PlayerId) {
@@ -642,8 +698,8 @@ export class GameEngine {
 
     // Build logic
     const tryBuild = (type: BuildingType, cost: number, allowMultiple: boolean = false) => {
-      // Don't build if Player 1 is currently building something manually
-      if (playerId === 1 && this.buildQueue) return false;
+      // Don't build if Player 1 is currently building something manually (not in demo mode)
+      if (playerId === 1 && this.buildQueue && !this.demoActive) return false;
 
       if (ai.credits >= cost && (allowMultiple || !aiBuildings.some(b => b.type === type))) {
         ai.credits -= cost;
