@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/stennu718/command-watch/actions/workflows/tests.yml/badge.svg)](https://github.com/stennu718/command-watch/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg)](https://stennu718.github.io/command-watch/)
+
+![Gameplay](docs/screenshot.png)
 
 ## Description
 
