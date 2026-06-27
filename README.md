@@ -2,15 +2,10 @@
 
 [![CI](https://github.com/stennu718/command-watch/actions/workflows/tests.yml/badge.svg)](https://github.com/stennu718/command-watch/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg)](https://stennu718.github.io/command-watch/)
 [![Version](https://img.shields.io/github/v/release/stennu718/command-watch)](https://github.com/stennu718/command-watch/releases)
 [![Docker](https://img.shields.io/badge/Docker-Build-2496ED.svg?logo=docker&logoColor=white)](https://github.com/stennu718/command-watch/pkgs/container/command-watch)
 
 ![Gameplay](docs/screenshot.png)
-
-## Live Demo
-
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg)](https://stennu718.github.io/command-watch/)
 
 ## Description
 
@@ -86,10 +81,6 @@ command-watch/
 └── tsconfig.json          # TypeScript configuration
 ```
 
-## Screenshots
-
-![Gameplay](docs/screenshot-gameplay.png)
-
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
@@ -97,6 +88,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
-
-<!-- pages trigger 1782553342 -->
-# test
