@@ -15,6 +15,15 @@ Command Watch is a real-time strategy (RTS) game inspired by the classic Command
 
 ![Demo](docs/demo.gif)
 
+## Try it
+
+🎮 **[Try Live Demo](https://stennu718.github.io/command-watch/demo/)** — watch AI vs AI battle, play against AI
+
+Or run locally:
+```bash
+npm install && npm run dev
+```
+
 ## Features
 
 - **Real-time strategy gameplay** — Classic RTS mechanics with units, buildings, and base management
