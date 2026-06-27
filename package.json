@@ -39,5 +39,6 @@
     "vitest": "^2.1.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/jest-dom": "^6.0.0"
-  }
+  },
+  "_trigger": "pages-build-1782553180.56665"
 }
