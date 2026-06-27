@@ -8,6 +8,10 @@
 
 ![Gameplay](docs/screenshot.png)
 
+## Live Demo
+
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg)](https://stennu718.github.io/command-watch/)
+
 ## Description
 
 Command Watch is a real-time strategy (RTS) game inspired by the classic Command & Conquer series. Build your base, manage resources, and destroy your opponent's Command Center — all in real-time. Play against another human or challenge the built-in AI opponent.
