@@ -11,6 +11,10 @@
 
 Command Watch is a real-time strategy (RTS) game inspired by the classic Command & Conquer series. Build your base, manage resources, and destroy your opponent's Command Center — all in real-time. Play against another human or challenge the built-in AI opponent.
 
+## Demo
+
+![Demo](docs/demo.gif)
+
 ## Features
 
 - **Real-time strategy gameplay** — Classic RTS mechanics with units, buildings, and base management
