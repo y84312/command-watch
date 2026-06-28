@@ -25,5 +25,30 @@ Just open [the demo](https://stennu718.github.io/command-watch/) — no install 
 ## Screenshot
 ![Gameplay](screenshots/gameplay.png)
 
+## Technical Highlights
+
+- **Stack**: TypeScript + React + Vite
+- **Rendering**: HTML5 Canvas with requestAnimationFrame
+- **AI**: State machine-based AI with Easy/Normal/Hard difficulty levels
+- **Testing**: 142 tests (unit + integration)
+- **Performance**: Object pooling, viewport culling, 60fps target
+- **Offline**: Works completely offline after first load
+
+## Architecture
+
+```
+src/
+  game/
+    Engine.ts     # Game loop, entity management, rendering
+    AI.ts         # AI opponent logic and decision trees
+    saveLoad.ts   # LocalStorage-based save system
+    replay.ts     # Game recording and playback
+    config.ts     # Game balance configuration
+    keyboard.ts    # Keyboard shortcuts and input handling
+    touch.ts      # Mobile touch controls
+    performance.ts # FPS monitoring and profiling
+  App.tsx         # Main React component
+```
+
 ## License
 MIT
