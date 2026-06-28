@@ -3,6 +3,10 @@ import { COSTS, BUILD_TIMES, POWER, SIZES, STATS, MAP_SIZE } from './constants';
 import { audio } from './Audio';
 import { decideAiAction, AiContext } from './AiLogic';
 import { Entity, Building, Unit, Ore, Projectile } from './entities';
+import { PerformanceMonitor } from './performance';
+import { ReplayRecorder } from './replay';
+import { CommandRateLimiter, validateGameState } from './validation';
+import { Difficulty, getDifficultyConfig } from './config';
 
 export class GameEngine {
   canvas: HTMLCanvasElement;
@@ -36,6 +40,21 @@ export class GameEngine {
   aiTimer: number = 0;
   aiState: 'build_power' | 'build_refinery' | 'build_barracks' | 'build_warfactory' | 'spam' = 'build_power';
   aiScoutedBase: Record<PlayerId, boolean> = { 1: false, 2: false };
+  aiDifficulty: Difficulty = 'normal';
+
+  // Performance monitoring
+  perfMonitor: PerformanceMonitor = new PerformanceMonitor();
+  gameTime: number = 0;
+
+  // Replay system
+  replayRecorder: ReplayRecorder = new ReplayRecorder(MAP_SIZE.w, MAP_SIZE.h);
+  recordingActive: boolean = false;
+
+  // Validation
+  commandLimiter: CommandRateLimiter = new CommandRateLimiter();
+
+  // Game state validation
+  lastValidationErrors: string[] = [];
 
   // FOW State
   fowCols: number;
@@ -350,6 +369,9 @@ export class GameEngine {
   }
 
   update(dt: number) {
+    this.perfMonitor.startFrame();
+    this.gameTime += dt;
+
     this.handleCameraPan(dt);
     this.updateBuildQueue(dt);
     this.updateUnits(dt);
@@ -363,6 +385,14 @@ export class GameEngine {
     this.buildings = this.buildings.filter(b => !b.dead);
     this.ores = this.ores.filter(o => !o.dead);
     this.projectiles = this.projectiles.filter(p => !p.dead);
+
+    // Periodic validation
+    if (Math.floor(this.gameTime / 5000) !== Math.floor((this.gameTime - dt) / 5000)) {
+      const result = validateGameState(this.players, this.units.length + this.buildings.length);
+      this.lastValidationErrors = result.errors;
+    }
+
+    this.perfMonitor.endFrame();
   }
 
   handleCameraPan(dt: number) {
@@ -671,7 +701,9 @@ export class GameEngine {
 
   updateAI(dt: number) {
     this.aiTimer += dt;
-    const interval = this.demoActive ? 500 : 2000; // Faster AI in demo mode
+    const diffConfig = getDifficultyConfig(this.aiDifficulty);
+    const baseInterval = this.demoActive ? 500 : 2000;
+    const interval = baseInterval * diffConfig.aiBuildDelay;
     if (this.aiTimer < interval) return;
     this.aiTimer = 0;
 
@@ -684,7 +716,15 @@ export class GameEngine {
       if (winner) {
         this.demoActive = false;
         this.onStateChange({ ...this.buildings, winner } as any);
+        if (this.recordingActive) {
+          this.recordingActive = false;
+        }
       }
+    }
+
+    // Record replay frame
+    if (this.recordingActive) {
+      this.replayRecorder.tick([]);
     }
   }
 
@@ -960,6 +1000,56 @@ export class GameEngine {
       buildQueue: this.buildQueue ? { ...this.buildQueue } : null,
       placingBuilding: this.placingBuilding,
     });
+  }
+
+  // ─── Replay System ───────────────────────────────────────────────────────
+  startRecording(): void {
+    this.replayRecorder.start();
+    this.recordingActive = true;
+  }
+
+  stopRecording() {
+    this.recordingActive = false;
+    this.replayRecorder.stop();
+    return this.replayRecorder.finalize(this.checkWinner());
+  }
+
+  getReplayRecorder(): ReplayRecorder {
+    return this.replayRecorder;
+  }
+
+  // ─── Difficulty ──────────────────────────────────────────────────────────
+  setDifficulty(difficulty: Difficulty): void {
+    this.aiDifficulty = difficulty;
+  }
+
+  getDifficulty(): Difficulty {
+    return this.aiDifficulty;
+  }
+
+  // ─── Performance Metrics ─────────────────────────────────────────────────
+  getPerformanceMetrics() {
+    return this.perfMonitor.getMetrics(
+      this.units.length + this.buildings.length + this.ores.length + this.projectiles.length,
+      this.units.length,
+      this.buildings.length,
+      this.projectiles.length,
+      this.ores.length,
+    );
+  }
+
+  getFps(): number {
+    return this.perfMonitor.getFps();
+  }
+
+  // ─── Game State Validation ───────────────────────────────────────────────
+  validateState(): { valid: boolean; errors: string[]; warnings: string[] } {
+    return validateGameState(this.players, this.units.length + this.buildings.length);
+  }
+
+  // ─── Command Rate Limiting ───────────────────────────────────────────────
+  checkCommandRate(playerId: PlayerId, commandType: string): boolean {
+    return this.commandLimiter.check(playerId, commandType);
   }
 
   draw() {
